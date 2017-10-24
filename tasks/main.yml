@@ -1,0 +1,97 @@
+---
+# tasks file for ansible-role-pacaur
+
+# Run the equivalent of "pacman -Syu" as a separate step
+- pacman:
+    update_cache: yes
+    upgrade: yes
+
+- name: Ensure build prerequisites are installed
+  pacman:
+    name: "{{ item }}"
+    state: present
+  with_items:
+    - binutils                                                                                           
+    - make                                                                                               
+    - gcc                                                                                                
+    - fakeroot                                                                                           
+    - pkg-config                                                                                         
+    - git                                                                                                
+    - expac                                                                                              
+    - yajl
+
+- name: "Create {{ aur_build_user}} user"
+  become_user: root
+  user:
+    name: "{{ aur_build_user }}"
+    append: true
+    groups: wheel
+    state: present
+
+- name: Check if cower is installed
+  command: 'pacman -Q cower'
+  register: cower_installed
+  changed_when: cower_installed.rc != 0
+  failed_when: false
+
+
+- name: Block cower
+  when: cower_installed.rc != 0
+  become_user: "{{ aur_build_user }}"
+  block:
+    - name: Create temp cower dir
+      file:
+        dest: /tmp/cower
+        state: directory
+
+    - name: Download cower
+      get_url:
+        url: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=cower
+        dest: /tmp/cower/PKGBUILD
+
+    - name: Install cower
+      when: cower_installed.rc != 0
+      shell:
+        chdir: /tmp/cower
+        cmd: |
+            export PATH=$PATH:/usr/bin/core_perl
+            makepkg PKGBUILD --skippgpcheck --install --needed --noconfirm
+
+    - name: Cleanup cower build directory
+      file:
+        path: /tmp/cower
+        state: absent
+
+
+- name: Check if pacaur is installed
+  command: 'pacman -Q pacaur'
+  register: pacaur_installed
+  changed_when: pacaur_installed.rc != 0
+  failed_when: false
+
+- name: Block pacaur
+  when: pacaur_installed.rc != 0
+  become_user: "{{ aur_build_user }}"
+  block:
+
+    - name: Create temp pacaur dir
+      file:
+        dest: /tmp/pacaur
+        state: directory
+
+    - name: Download pacaur
+      get_url:
+        url: https://aur.archlinux.org/cgit/aur.git/plain/PKGBUILD?h=pacaur
+        dest: /tmp/pacaur/PKGBUILD                                                                   
+ 
+    - name: Install pacaur
+      shell:
+        chdir: /tmp/pacaur
+        cmd: |
+            export PATH=$PATH:/usr/bin/core_perl
+            makepkg PKGBUILD --install --needed --noconfirm
+
+    - name: Cleanup pacaur build directory
+      file:
+        path: /tmp/pacaur
+        state: absent

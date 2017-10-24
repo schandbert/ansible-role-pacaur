@@ -1,0 +1,8 @@
+# Molecule managed
+
+FROM base/archlinux
+
+RUN pacman -Syu
+RUN pacman -S sudo --noconfirm
+RUN sed -i -r "s/^#\s(%wheel.*?NOPASSWD:\sALL$)/\1/g" /etc/sudoers
+RUN pacman -S python --noconfirm
